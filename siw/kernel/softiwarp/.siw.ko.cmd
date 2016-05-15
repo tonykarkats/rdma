@@ -1,0 +1,1 @@
+cmd_/home/acn/rdma_assignment_handout/siw/kernel/softiwarp/siw.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /home/acn/rdma_assignment_handout/siw/kernel/softiwarp/siw.ko /home/acn/rdma_assignment_handout/siw/kernel/softiwarp/siw.o /home/acn/rdma_assignment_handout/siw/kernel/softiwarp/siw.mod.o
