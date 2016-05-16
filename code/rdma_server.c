@@ -21,7 +21,7 @@ static struct ibv_qp_init_attr qp_init_attr;
 static struct ibv_qp *client_qp = NULL;
 /* RDMA memory resources */
 static struct ibv_mr *client_metadata_mr = NULL, *server_buffer_mr = NULL, *server_metadata_mr = NULL;
-static struct rdma_buffer_attr client_metadata_attr;
+static struct rdma_buffer_attr client_metadata_attr, server_metadata_attr;
 static struct ibv_recv_wr client_recv_wr, *bad_client_recv_wr = NULL;
 static struct ibv_sge client_recv_sge;
 
@@ -166,7 +166,7 @@ static int start_rdma_server(struct sockaddr_in *server_addr)
 	printf("Server is listening successfully at: %s , port: %d \n",
 			inet_ntoa(server_addr->sin_addr),
 			ntohs(server_addr->sin_port));
-	/* now, we expect a client to connect and generate a RDMA_CM_EVNET_CONNECT_REQUEST 
+	/* now, we expect a client to connect and generate a RDMA_CM_EVENT_CONNECT_REQUEST 
 	 * We wait (block) on the connection management event channel for 
 	 * the connect event. 
 	 */
@@ -246,11 +246,11 @@ static int accept_client_connection()
 	       rdma_error("Failed to accept the connection, errno: %d \n", -errno);
 	       return -errno;
        }
-       /* We expect an RDMA_CM_EVNET_ESTABLISHED to indicate that the RDMA  
+       /* We expect an RDMA_CM_EVENT_ESTABLISHED to indicate that the RDMA  
 	* connection has been established and everything is fine on both, server 
 	* as well as the client sides.
 	*/
-        debug("Going to wait for : RDMA_CM_EVENT_ESTABLISHED event \n");
+       debug("Going to wait for : RDMA_CM_EVENT_ESTABLISHED event \n");
        ret = process_rdma_cm_event(cm_event_channel, 
 		       RDMA_CM_EVENT_ESTABLISHED,
 		       &cm_event);
@@ -294,9 +294,55 @@ static int send_server_metadata_to_client()
 	printf("The client has requested buffer length of : %u bytes \n", 
 			client_metadata_attr.length);
 
-	rdma_error("This function is not yet implemented \n");
-	/* IMPLEMENT THIS FUNCTION */
-       return -ENOSYS;
+	// rdma_error("This function is not yet implemented \n");
+	/* Try to allocate the desired buffer for the client */
+        enum ibv_access_flags permissions = (IBV_ACCESS_REMOTE_READ  |
+                                             IBV_ACCESS_REMOTE_WRITE |
+					     IBV_ACCESS_LOCAL_WRITE);
+
+	server_buffer_mr = rdma_buffer_alloc(pd, client_metadata_attr.length, permissions);
+
+	server_metadata_attr.address = (uint64_t)server_buffer_mr->addr;
+	server_metadata_attr.length = server_buffer_mr->length;
+	server_metadata_attr.stag.local_stag = server_buffer_mr->lkey;
+		
+	server_metadata_mr = rdma_buffer_register(pd,
+			&server_metadata_attr,
+			sizeof(server_metadata_attr),
+			IBV_ACCESS_LOCAL_WRITE);
+
+	if(!server_metadata_mr) {
+		rdma_error("Failed to register memory for server metadata , ret = %d\n", -errno);
+		return -errno;
+	}
+
+	// Create SGE for the server_metadata_mr memory region.
+	struct ibv_sge server_metadata_sge;
+	server_metadata_sge.addr = (uint64_t)server_metadata_mr->addr;
+	server_metadata_sge.length = server_metadata_mr->length;
+	server_metadata_sge.lkey = server_metadata_mr->lkey;
+
+	// Create WR
+	struct ibv_send_wr server_metadata_wr;
+	memset(&server_metadata_wr, 0, sizeof(server_metadata_wr));
+	// Normally a list is needed but our implementation has only one WR
+	// TODO: Check if this actually works correctly!!
+	server_metadata_wr.sg_list = &wc;
+	server_metadata_wr.num_sge = 1;
+	server_metadata_wr.opcode = IBV_WR_SEND;
+	server_metadata_wr.send_flags = IBV_SEND_SIGNALED;
+
+	// bad_wr needed by ibv_post_send
+	struct ibv_send_wr *bad_wr = NULL;
+
+	// Send WR to client
+	ret = ibv_post_send(client_qp, &server_metadata_wr, &bad_wr);
+	if (ret) {
+		rdma_error("Failed to send server metadata to client, ret = %d\n", -ret);
+		return -ret;
+	}
+
+       return 0;
 }
 
 /* This is server side logic. Server passively waits for the client to call 

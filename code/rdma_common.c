@@ -109,6 +109,7 @@ int process_rdma_cm_event(struct rdma_event_channel *echannel,
 		struct rdma_cm_event **cm_event)
 {
 	int ret = 1;
+        /* This call blocks until the next event is received */
 	ret = rdma_get_cm_event(echannel, cm_event);
 	if (ret) {
 		rdma_error("Failed to retrieve a cm event, errno: %d \n",
