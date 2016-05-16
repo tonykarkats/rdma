@@ -327,7 +327,7 @@ static int send_server_metadata_to_client()
 	memset(&server_metadata_wr, 0, sizeof(server_metadata_wr));
 	// Normally a list is needed but our implementation has only one WR
 	// TODO: Check if this actually works correctly!!
-	server_metadata_wr.sg_list = &wc;
+	server_metadata_wr.sg_list = &server_metadata_sge;
 	server_metadata_wr.num_sge = 1;
 	server_metadata_wr.opcode = IBV_WR_SEND;
 	server_metadata_wr.send_flags = IBV_SEND_SIGNALED;
