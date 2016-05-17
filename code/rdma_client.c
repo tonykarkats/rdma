@@ -32,6 +32,8 @@ static char *src = NULL, *dst = NULL;
 /* This is our testing function */
 static int check_src_dst() 
 {
+	printf("src = %s\n", src);
+	printf("dst = %s\n", dst);
 	return memcmp((void*) src, (void*) dst, strlen(src));
 }
 
@@ -307,10 +309,72 @@ static int client_send_metadata_to_server()
  */ 
 static int client_remote_memory_ops() 
 {
-	rdma_error("This function is not yet implemented \n");
-	/* Implement this function */
-	return -ENOSYS;
+	/* RDMA Write */
+	
+	/* Local memory that we want to transfer to server.
+	   This is exactly the region that we registered before.
+	 */
+	struct ibv_sge write_sge;
+	write_sge.addr = (uint64_t)client_src_mr->addr;
+	write_sge.length = client_src_mr->length;
+	write_sge.lkey = client_src_mr->lkey;
+	
+	struct ibv_send_wr write_wr;
+	memset(&write_wr, 0, sizeof(write_wr));
+
+	write_wr.sg_list = &write_sge;
+	write_wr.num_sge = 1;
+	write_wr.opcode = IBV_WR_RDMA_WRITE;
+	write_wr.wr.rdma.remote_addr = server_metadata_attr.address;
+	write_wr.wr.rdma.rkey = server_metadata_attr.stag.local_stag;
+
+	int ret = -1;
+	struct ibv_send_wr *bad_wr = NULL;
+
+	printf("Posting WRITE WR\n");
+	ret = ibv_post_send(client_qp, &write_wr, &bad_wr);
+	if (ret) {
+		rdma_error("Error in RDMA write. ret = %d\n", -ret);
+		return -ret;
+	}
+
+	/* RDMA Read from remote buffer to dst*/
+	
+	/* First we have to register our dst buffer */
+	client_dst_mr = rdma_buffer_register(pd, dst, strlen(src),
+				      IBV_ACCESS_LOCAL_WRITE);
+	if (!client_dst_mr) {
+		rdma_error("Error in registering dst_mr\n");
+		return -1;
+	}
+
+	/* Prepare and post READ WR similar to 'write' above */	
+	struct ibv_sge read_sge;
+	read_sge.addr = (uint64_t)client_dst_mr->addr;
+	read_sge.length = client_dst_mr->length;
+	read_sge.lkey = client_dst_mr->lkey;
+
+	// Create work request
+	struct ibv_send_wr read_wr;
+	memset(&read_wr, 0, sizeof(read_wr));
+	read_wr.sg_list = &read_sge;
+	read_wr.num_sge = 1;
+	read_wr.opcode = IBV_WR_RDMA_READ;
+	read_wr.wr.rdma.remote_addr = server_metadata_attr.address;
+	read_wr.wr.rdma.rkey = server_metadata_attr.stag.local_stag;
+
+	// Post work request
+	printf("Posting READ WR\n");
+	ret = ibv_post_send(client_qp, &read_wr, &bad_wr);
+	if (ret) {
+		rdma_error("Error in RDMA read.  ret =  %d\n", -ret);
+		return -ret;
+	}
+
+
+	return 0;
 }
+
 
 /* This function disconnects the RDMA connection from the server and cleans up 
  * all the resources.

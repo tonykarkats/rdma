@@ -342,6 +342,9 @@ static int send_server_metadata_to_client()
 		return -ret;
 	}
 
+	printf("Sent server metadata to client succesfully!!\n");
+	show_rdma_buffer_attr(&server_metadata_attr);
+
        return 0;
 }
 
