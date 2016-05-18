@@ -325,13 +325,14 @@ static int client_remote_memory_ops()
 	write_wr.sg_list = &write_sge;
 	write_wr.num_sge = 1;
 	write_wr.opcode = IBV_WR_RDMA_WRITE;
+	write_wr.send_flags = IBV_SEND_SIGNALED;
 	write_wr.wr.rdma.remote_addr = server_metadata_attr.address;
 	write_wr.wr.rdma.rkey = server_metadata_attr.stag.local_stag;
 
 	int ret = -1;
 	struct ibv_send_wr *bad_wr = NULL;
 
-	printf("Posting WRITE WR\n");
+	//printf("Posting WRITE WR\n");
 	ret = ibv_post_send(client_qp, &write_wr, &bad_wr);
 	if (ret) {
 		rdma_error("Error in RDMA write. ret = %d\n", -ret);
@@ -360,17 +361,31 @@ static int client_remote_memory_ops()
 	read_wr.sg_list = &read_sge;
 	read_wr.num_sge = 1;
 	read_wr.opcode = IBV_WR_RDMA_READ;
+	read_wr.send_flags = IBV_SEND_SIGNALED;
 	read_wr.wr.rdma.remote_addr = server_metadata_attr.address;
 	read_wr.wr.rdma.rkey = server_metadata_attr.stag.local_stag;
 
 	// Post work request
-	printf("Posting READ WR\n");
+	//printf("Posting READ WR\n");
 	ret = ibv_post_send(client_qp, &read_wr, &bad_wr);
 	if (ret) {
 		rdma_error("Error in RDMA read.  ret =  %d\n", -ret);
 		return -ret;
 	}
 
+
+	/* Wait for the 2 events to be completed. 2 elements will be added in the
+	   completion queue then. 
+	*/
+
+	struct ibv_wc wc[2];
+	ret = process_work_completion_events(io_completion_channel, 
+			wc, 2);
+	if(ret != 2) {
+		rdma_error("We failed to get 2 work completions , ret = %d \n",
+				ret);
+		return ret;
+	}
 
 	return 0;
 }

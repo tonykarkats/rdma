@@ -345,6 +345,13 @@ static int send_server_metadata_to_client()
 	printf("Sent server metadata to client succesfully!!\n");
 	show_rdma_buffer_attr(&server_metadata_attr);
 
+	printf("Waiting until client performs the requested actions..\n");
+
+	ret = process_work_completion_events(io_completion_channel, &wc, 1);
+	if (ret != 1) {
+		rdma_error("Failed to receive , ret = %d \n", ret);
+		return ret;
+	}
        return 0;
 }
 
@@ -472,6 +479,7 @@ int main(int argc, char **argv)
 		rdma_error("Failed to send server metadata to the client, ret = %d \n", ret);
 		return ret;
 	}
+
 	ret = disconnect_and_cleanup();
 	if (ret) { 
 		rdma_error("Failed to clean up resources properly, ret = %d \n", ret);
