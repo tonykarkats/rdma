@@ -294,18 +294,20 @@ static int send_server_metadata_to_client()
 	printf("The client has requested buffer length of : %u bytes \n", 
 			client_metadata_attr.length);
 
-	// rdma_error("This function is not yet implemented \n");
 	/* Try to allocate the desired buffer for the client */
         enum ibv_access_flags permissions = (IBV_ACCESS_REMOTE_READ  |
                                              IBV_ACCESS_REMOTE_WRITE |
 					     IBV_ACCESS_LOCAL_WRITE);
 
+	/* allocate a buffer for the client according to what client asked in client_metadata_attr */
 	server_buffer_mr = rdma_buffer_alloc(pd, client_metadata_attr.length, permissions);
 
+	/* start creating server_metadata */
 	server_metadata_attr.address = (uint64_t)server_buffer_mr->addr;
 	server_metadata_attr.length = server_buffer_mr->length;
 	server_metadata_attr.stag.local_stag = server_buffer_mr->lkey;
 		
+        /* register metadata with rdma */
 	server_metadata_mr = rdma_buffer_register(pd,
 			&server_metadata_attr,
 			sizeof(server_metadata_attr),
@@ -316,26 +318,26 @@ static int send_server_metadata_to_client()
 		return -errno;
 	}
 
-	// Create SGE for the server_metadata_mr memory region.
+	/* Create SGE for the server_metadata_mr memory region. */
 	struct ibv_sge server_metadata_sge;
 	server_metadata_sge.addr = (uint64_t)server_metadata_mr->addr;
 	server_metadata_sge.length = server_metadata_mr->length;
 	server_metadata_sge.lkey = server_metadata_mr->lkey;
 
-	// Create WR
+	/* Create WR */
 	struct ibv_send_wr server_metadata_wr;
 	memset(&server_metadata_wr, 0, sizeof(server_metadata_wr));
-	// Normally a list is needed but our implementation has only one WR
-	// TODO: Check if this actually works correctly!!
+
+	/* Normally a list is needed but our implementation has only one WR */
 	server_metadata_wr.sg_list = &server_metadata_sge;
 	server_metadata_wr.num_sge = 1;
 	server_metadata_wr.opcode = IBV_WR_SEND;
 	server_metadata_wr.send_flags = IBV_SEND_SIGNALED;
 
-	// bad_wr needed by ibv_post_send
+	/* bad_wr needed by ibv_post_send */
 	struct ibv_send_wr *bad_wr = NULL;
 
-	// Send WR to client
+	/* Send WR to client */
 	ret = ibv_post_send(client_qp, &server_metadata_wr, &bad_wr);
 	if (ret) {
 		rdma_error("Failed to send server metadata to client, ret = %d\n", -ret);
@@ -343,6 +345,8 @@ static int send_server_metadata_to_client()
 	}
 
 	printf("Sent server metadata to client succesfully!!\n");
+
+	/* Print metadata of server */
 	show_rdma_buffer_attr(&server_metadata_attr);
 
 	printf("Waiting until client performs the requested actions..\n");

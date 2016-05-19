@@ -309,7 +309,6 @@ static int client_send_metadata_to_server()
  */ 
 static int client_remote_memory_ops() 
 {
-	/* RDMA Write */
 	
 	/* Local memory that we want to transfer to server.
 	   This is exactly the region that we registered before.
@@ -332,14 +331,12 @@ static int client_remote_memory_ops()
 	int ret = -1;
 	struct ibv_send_wr *bad_wr = NULL;
 
-	//printf("Posting WRITE WR\n");
+	/* Write src to server */
 	ret = ibv_post_send(client_qp, &write_wr, &bad_wr);
 	if (ret) {
 		rdma_error("Error in RDMA write. ret = %d\n", -ret);
 		return -ret;
 	}
-
-	/* RDMA Read from remote buffer to dst*/
 	
 	/* First we have to register our dst buffer */
 	client_dst_mr = rdma_buffer_register(pd, dst, strlen(src),
@@ -355,7 +352,7 @@ static int client_remote_memory_ops()
 	read_sge.length = client_dst_mr->length;
 	read_sge.lkey = client_dst_mr->lkey;
 
-	// Create work request
+	/* Create work request */
 	struct ibv_send_wr read_wr;
 	memset(&read_wr, 0, sizeof(read_wr));
 	read_wr.sg_list = &read_sge;
@@ -365,8 +362,7 @@ static int client_remote_memory_ops()
 	read_wr.wr.rdma.remote_addr = server_metadata_attr.address;
 	read_wr.wr.rdma.rkey = server_metadata_attr.stag.local_stag;
 
-	// Post work request
-	//printf("Posting READ WR\n");
+	/* Post work request */
 	ret = ibv_post_send(client_qp, &read_wr, &bad_wr);
 	if (ret) {
 		rdma_error("Error in RDMA read.  ret =  %d\n", -ret);
@@ -377,7 +373,6 @@ static int client_remote_memory_ops()
 	/* Wait for the 2 events to be completed. 2 elements will be added in the
 	   completion queue then. 
 	*/
-
 	struct ibv_wc wc[2];
 	ret = process_work_completion_events(io_completion_channel, 
 			wc, 2);
