@@ -302,6 +302,9 @@ static int client_send_metadata_to_server()
 static int client_remote_memory_ops() 
 {
 	
+        /* RDMA WRITE */
+        /**************/
+
 	/* Local memory that we want to transfer to server.
 	   This is exactly the region that we registered before.
 	 */
@@ -337,6 +340,10 @@ static int client_remote_memory_ops()
 		rdma_error("Error in registering dst_mr\n");
 		return -1;
 	}
+
+
+        /* RDMA READ */
+        /*************/
 
 	/* Prepare and post READ WR similar to 'write' above */	
 	struct ibv_sge read_sge;
