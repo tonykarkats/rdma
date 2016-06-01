@@ -1,13 +1,3 @@
-/*
- * This is RDMA server side code for assignment 8 in the 
- * Advanced Computer Network (ACN) course. 
- *
- * Author: Animesh Trivedi 
- *         atr@zurich.ibm.com (atrivedi@student.ethz.ch) 
- *
- * TODO: Cleanup previously allocated resources in case of an error condition
- */
-
 #include "rdma_common.h"
 
 /* These are the RDMA resources needed to setup an RDMA connection */

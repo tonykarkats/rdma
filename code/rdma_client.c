@@ -1,11 +1,3 @@
-/*
- * This is RDMA client side code for the assignment 8 in the 
- * Advanced Computer Network (ACN) course. 
- *
- * Author: Animesh Trivedi 
- *         atr@zurich.ibm.com (atrivedi@student.ethz.ch)
- */
-
 #include "rdma_common.h"
 
 /* These are basic RDMA resources */
